@@ -12,8 +12,10 @@ export default function LocationList() {
   const [zone, setZone] = useState("");
   const [row, setRow] = useState("");
   const [bay, setBay] = useState("");
+  const [size, setSize] = useState("");
   const [locations, setLocations] = useState([]);
   const [selectedLocations, setSelectedLocations] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   // const isOperationAnalystis = user?.roles?.includes("Operation Analystis");
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -50,6 +52,7 @@ export default function LocationList() {
   };
 
   const fetchLocationData = async (page = 1) => {
+    setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({
@@ -57,6 +60,7 @@ export default function LocationList() {
         ...(zone ? { zone } : {}),
         ...(row ? { row } : {}),
         ...(bay ? { bay } : {}),
+        ...(size ? { level: size } : {}),
       });
 
       const res = await fetch(`/api/locations?${params.toString()}`, {
@@ -82,12 +86,14 @@ export default function LocationList() {
       setSelectedLocations([]);
     } catch (err) {
       console.error("Failed to load location data:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchLocationData();
-  }, [zone, row, bay, branchId]);
+  }, [zone, row, bay, size, branchId]);
   
   const printUser =
   user?.user?.emp_id === "003-001055" ||
@@ -138,12 +144,23 @@ export default function LocationList() {
               placeholder="Enter Bay"
             />
           </div>
+          <div className="w-full">
+            <label className="font-medium block">Size</label>
+            <input
+              type="text"
+              value={size}
+              onChange={(e) => setSize(e.target.value)}
+              className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4"
+              placeholder="Enter Size"
+            />
+          </div>
           <div className="w-full flex items-end">
             <button
               onClick={handleSelectAll}
-              className="w-full mt-2 bg-[#107a8b] text-white py-2 rounded-lg hover:bg-[#0d6e7b]"
+              disabled={isLoading || locations.length === 0}
+              className="w-full mt-2 bg-[#107a8b] text-white py-2 rounded-lg hover:bg-[#0d6e7b] disabled:opacity-50"
             >
-              {selectedLocations.length === locations.length
+              {selectedLocations.length === locations.length && locations.length > 0
                 ? "Unselect All"
                 : "Select All"}
             </button>
@@ -172,9 +189,16 @@ export default function LocationList() {
       </div>
 
       <div className="p-4 space-y-6">
-  
+        {isLoading && (
+          <p className="p-4 text-center text-gray-500">Loading…</p>
+        )}
+
+        {!isLoading && locations.length === 0 && (
+          <p className="p-4 text-center text-gray-500">No locations found.</p>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {locations.map((location) => (
+          {!isLoading && locations.map((location) => (
             <div
               key={location.id}
               className="border p-4 rounded-xl shadow bg-white"
@@ -346,7 +370,7 @@ export default function LocationList() {
       {/* Pagination */}
       <div className="mt-6 flex justify-center gap-4">
         <button
-          disabled={pagination.current_page === 1}
+          disabled={isLoading || pagination.current_page === 1}
           onClick={() => handlePageChange(pagination.current_page - 1)}
           className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
         >
@@ -354,6 +378,7 @@ export default function LocationList() {
         </button>
         <button
           disabled={
+            isLoading ||
             pagination.current_page * pagination.per_page >= pagination.total
           }
           onClick={() => handlePageChange(pagination.current_page + 1)}

@@ -76,11 +76,22 @@ export default function LocationList() {
 
       const locationArray = json.data.data ?? [];
 
-      setLocations(locationArray);
+      // Deduplicate by `location_name` so same location code doesn't render multiple times
+      // (backend doesn't enforce uniqueness on location_name).
+      const seenLocationNames = new Set();
+      const uniqueLocations = [];
+      for (const loc of locationArray) {
+        if (!loc?.location_name) continue;
+        if (seenLocationNames.has(loc.location_name)) continue;
+        seenLocationNames.add(loc.location_name);
+        uniqueLocations.push(loc);
+      }
+
+      setLocations(uniqueLocations);
       setPagination({
         current_page: json.data.current_page ?? 1,
-        total: json.data.total ?? locationArray.length,
-        per_page: json.data.per_page ?? locationArray.length,
+        total: json.data.total ?? uniqueLocations.length,
+        per_page: json.data.per_page ?? uniqueLocations.length,
       });
 
       setSelectedLocations([]);
@@ -160,7 +171,8 @@ export default function LocationList() {
               disabled={isLoading || locations.length === 0}
               className="w-full mt-2 bg-[#107a8b] text-white py-2 rounded-lg hover:bg-[#0d6e7b] disabled:opacity-50"
             >
-              {selectedLocations.length === locations.length && locations.length > 0
+              {selectedLocations.length === locations.length &&
+              locations.length > 0
                 ? "Unselect All"
                 : "Select All"}
             </button>

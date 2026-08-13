@@ -50,7 +50,8 @@ export default function Sidebar() {
     } else if (path.includes("stock_in_lists") || path.includes("create_stockin")) setActiveItem("stock-in");
     else if (path.includes("stock_out_lists") || path.includes("create_stockout")) setActiveItem("stock-out");
     else if (path.includes("transfer_lists") || path.includes("create_transfer")) setActiveItem("transfer");
-    else if (path.includes("locations") || path.includes("create_location")) setActiveItem("location");
+    else if (path.includes("location_requests") || path.includes("location_request")) setActiveItem("location-request");
+    else if (path.includes("locations") || path.includes("create_location") || path.includes("add_location")) setActiveItem("location");
     else if (path.includes("stock_balance_lists"))
       setActiveItem("stock-balance");
     else setActiveItem("home");
@@ -387,6 +388,45 @@ export default function Sidebar() {
                   }`}
                 >
                   Location
+                </span>
+              </Link>
+            </li>
+            <li
+              className={`rounded-xl ${
+                activeItem === "location-request" ? "bg-primary" : ""
+              }`}
+            >
+              <Link
+                onClick={() => {
+                  setActiveItem("location-request");
+                  handleCloseSidebar();
+                }}
+                to="location_requests"
+                className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white dark:hover:bg-gray-700 group"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className={`size-6 ${
+                    activeItem === "location-request" ? "text-white" : "text-primary"
+                  }`}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                  />
+                </svg>
+
+                <span
+                  className={`ms-3 font-bold ${
+                    activeItem === "location-request" ? "text-white" : "text-primary"
+                  }`}
+                >
+                  Request Location
                 </span>
               </Link>
             </li>

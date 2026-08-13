@@ -36,6 +36,10 @@ const router = createBrowserRouter([
         lazy: lazyPage(() => import("../pages/locations/Create_Location.jsx")),
       },
       {
+        path: "add_location",
+        lazy: lazyPage(() => import("../pages/locations/Add_Location.jsx")),
+      },
+      {
         path: "stock_out_lists",
         lazy: lazyPage(() => import("../pages/stock-out/StockOut_List.jsx")),
       },
@@ -50,6 +54,14 @@ const router = createBrowserRouter([
       {
         path: "locations",
         lazy: lazyPage(() => import("../pages/locations/Location_List.jsx")),
+      },
+      {
+        path: "location_requests",
+        lazy: lazyPage(() => import("../pages/locations/Request_Location_List.jsx")),
+      },
+      {
+        path: "location_request/:id",
+        lazy: lazyPage(() => import("../pages/locations/Request_Location_Detail.jsx")),
       },
       {
         path: "stock_balance_lists",

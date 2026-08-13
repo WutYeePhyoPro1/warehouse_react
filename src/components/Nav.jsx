@@ -8,9 +8,15 @@ export default function Nav() {
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef();
+  const notificationRef = useRef();
   const [open, setOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const [branchDropdown, setBranchDropdown] = useState(false);
   const [branches, setBranches] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const isLocationApprover = user?.user?.emp_id === "000-000167";
 
   // Fetch branches
   useEffect(() => {
@@ -35,6 +41,58 @@ export default function Nav() {
     };
     fetchBranches();
   }, []);
+
+  useEffect(() => {
+    if (!isLocationApprover) return;
+
+    const fetchNotifications = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        const res = await fetch("/api/notifications", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        setNotifications(json.data ?? []);
+        setUnreadCount(json.unread_count ?? 0);
+      } catch (error) {
+        console.error("Failed to fetch notifications", error);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    const handleRefresh = () => fetchNotifications();
+    window.addEventListener("location-notifications-refresh", handleRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("location-notifications-refresh", handleRefresh);
+    };
+  }, [isLocationApprover, location.pathname]);
+
+  const handleNotificationClick = (notification) => {
+    setNotificationOpen(false);
+    navigate(`/location_request/${notification.location_request_id}`);
+  };
+
+  const formatRelativeTime = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    const diffMs = Date.now() - date.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
 
   const selectedBranch = branches.find(
     (b) => String(b.id) === String(user?.user?.branch_id)
@@ -83,7 +141,16 @@ export default function Nav() {
         return "Transfer Lists";
       case "/locations":
         return "Location Lists";
+      case "/location_requests":
+        return "Request Location";
+      case "/create_location":
+        return "Create Location";
+      case "/add_location":
+        return "Add Location";
       default:
+        if (location.pathname.startsWith("/location_request/")) {
+          return "Request Location Detail";
+        }
         return "Warehouse System";
     }
   };
@@ -116,6 +183,12 @@ export default function Nav() {
         setOpen(false);
         setBranchDropdown(false);
       }
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(e.target)
+      ) {
+        setNotificationOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -126,7 +199,170 @@ export default function Nav() {
       <h1 className="text-primary text-xl font-bold font-poppin">
         {getTitleByPath()}
       </h1>
-      <div>
+      <div className="flex items-center gap-3">
+        {isLocationApprover && (
+          <div className="relative" ref={notificationRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setNotificationOpen((v) => !v);
+                setOpen(false);
+              }}
+              className="relative w-10 h-10 border-2 border-[#107a8b] rounded-full flex items-center justify-center text-[#107a8b] hover:bg-[#107a8b]/10 transition-colors"
+              title="Notifications"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
+                />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-sm ring-2 ring-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            {notificationOpen && (
+              <div className="absolute right-0 mt-2 w-[22rem] max-h-[28rem] overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-200 z-50">
+                <div className="px-4 py-3 bg-[#107a8b] text-white">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold tracking-wide text-white">
+                        Notifications
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.85)" }}>
+                        Pending location requests
+                      </p>
+                    </div>
+                    {unreadCount > 0 && (
+                      <span
+                        className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+                        style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+                      >
+                        {unreadCount} new
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="px-6 py-10 text-center">
+                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                          className="size-6"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium text-slate-700">
+                        All caught up
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        No pending location requests
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {notifications.map((notification) => {
+                        const locationCode =
+                          notification.location_request?.location_name ||
+                          notification.message?.replace(
+                            /^New location request:\s*/i,
+                            ""
+                          );
+                        const requester =
+                          notification.location_request?.user?.name ||
+                          notification.location_request?.user?.emp_id ||
+                          "Unknown";
+
+                        return (
+                          <li key={notification.id}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleNotificationClick(notification)
+                              }
+                              className="w-full text-left px-4 py-3.5 hover:bg-[#f0f9fa] transition-colors"
+                            >
+                              <div className="flex gap-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth={1.75}
+                                    stroke="currentColor"
+                                    className="size-4"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                                    />
+                                  </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-800">
+                                      New location request
+                                    </p>
+                                    <span className="shrink-0 text-[11px] text-slate-400">
+                                      {formatRelativeTime(
+                                        notification.created_at
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 font-mono text-sm font-bold text-[#107a8b] break-all">
+                                    {locationCode}
+                                  </p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    From {requester}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotificationOpen(false);
+                      navigate("/location_requests");
+                    }}
+                    className="w-full rounded-lg px-3 py-2 text-center text-sm font-semibold text-[#107a8b] hover:bg-white transition-colors"
+                  >
+                    View all requests
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <div className="relative inline-block text-left" ref={dropdownRef}>
           <button
             onClick={() => setOpen((v) => !v)}

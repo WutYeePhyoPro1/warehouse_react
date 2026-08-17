@@ -77,7 +77,17 @@ export default function Nav() {
 
   const handleNotificationClick = (notification) => {
     setNotificationOpen(false);
-    navigate(`/location_request/${notification.location_request_id}`);
+    if (notification.document_id) {
+      navigate(`/location_request/${notification.document_id}`);
+      return;
+    }
+    if (notification.location_request?.document_id) {
+      navigate(`/location_request/${notification.location_request.document_id}`);
+      return;
+    }
+    if (notification.location_request_id) {
+      navigate(`/location_request/${notification.location_request_id}`);
+    }
   };
 
   const formatRelativeTime = (value) => {
@@ -284,12 +294,14 @@ export default function Nav() {
                     <ul className="divide-y divide-slate-100">
                       {notifications.map((notification) => {
                         const locationCode =
+                          notification.document?.document_number ||
                           notification.location_request?.location_name ||
                           notification.message?.replace(
                             /^New location request:\s*/i,
                             ""
                           );
                         const requester =
+                          notification.document?.user?.name ||
                           notification.location_request?.user?.name ||
                           notification.location_request?.user?.emp_id ||
                           "Unknown";
@@ -323,7 +335,9 @@ export default function Nav() {
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start justify-between gap-2">
                                     <p className="text-sm font-semibold text-slate-800">
-                                      New location request
+                                      {notification.document_id
+                                        ? "New location document"
+                                        : "New location request"}
                                     </p>
                                     <span className="shrink-0 text-[11px] text-slate-400">
                                       {formatRelativeTime(

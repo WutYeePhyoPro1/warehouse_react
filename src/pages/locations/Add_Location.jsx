@@ -332,7 +332,29 @@ export default function AddLocation() {
   const [loading, setLoading] = useState(false);
   const [lineErrors, setLineErrors] = useState({});
   const [saveProgress, setSaveProgress] = useState(null);
+  const [duplicateCheckUi, setDuplicateCheckUi] = useState(null);
   const fileInputRef = useRef(null);
+  const linesScrollRef = useRef(null);
+
+  const scrollToLineKey = (lineKey) => {
+    try {
+      const container = linesScrollRef.current;
+      if (!container) return;
+
+      const key =
+        lineKey == null ? "" : typeof lineKey === "string" ? lineKey : String(lineKey);
+
+      const esc =
+        typeof CSS !== "undefined" && typeof CSS.escape === "function"
+          ? CSS.escape(key)
+          : key.replace(/["\\]/g, "\\$&");
+
+      const el = container.querySelector(`[data-line-key="${esc}"]`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch (e) {
+      // ignore scroll errors
+    }
+  };
 
   useEffect(() => {
     const fetchBranches = async () => {
@@ -697,6 +719,7 @@ export default function AddLocation() {
   ];
 
   const openSaveProgress = (lineCount) => {
+    setDuplicateCheckUi(null);
     setSaveProgress({
       steps: buildSaveSteps(lineCount).map((step, index) => ({
         ...step,
@@ -717,6 +740,7 @@ export default function AddLocation() {
         steps: prev.steps.map((step) => ({ ...step, status: "done" })),
       };
     });
+    setDuplicateCheckUi(null);
   };
 
   const resolveFailedStep = (json) => {
@@ -763,6 +787,134 @@ export default function AddLocation() {
     });
   };
 
+  const bulkCheckLocationCodesExists = async (locationNames) => {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("/api/location-check-bulk", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        location_names: locationNames,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const json = await res.json();
+    return Array.isArray(json?.exists) ? json.exists : [];
+  };
+
+  const runDuplicateCheckUi = async () => {
+    const items = lines.map((line, idx) => ({
+      key: line.key,
+      lineNo: idx + 1,
+      code: buildPreviewCode(line, branches),
+    }));
+
+    // Detect duplicates inside the same request first.
+    const counts = new Map();
+    for (const item of items) {
+      const k = item.code ?? "";
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+
+    const initialStatuses = {};
+    const toCheckCodes = [];
+    let checkedCount = 0;
+
+    for (const item of items) {
+      if (!item.code || item.code.includes("?")) {
+        initialStatuses[item.key] = "error";
+        checkedCount += 1;
+        continue;
+      }
+
+      const isDupInPayload = (counts.get(item.code) || 0) > 1;
+      if (isDupInPayload) {
+        initialStatuses[item.key] = "duplicate";
+        checkedCount += 1;
+      } else {
+        initialStatuses[item.key] = "checking";
+        toCheckCodes.push(item.code);
+      }
+    }
+
+    setDuplicateCheckUi({
+      total: items.length,
+      checkedCount,
+      items,
+      statuses: initialStatuses,
+    });
+
+    const statuses = { ...initialStatuses };
+    const uniqueCodes = [...new Set(toCheckCodes)];
+
+    let existsSet = new Set();
+    if (uniqueCodes.length > 0) {
+      try {
+        const exists = await bulkCheckLocationCodesExists(uniqueCodes);
+        existsSet = new Set(exists);
+      } catch (err) {
+        console.error("Bulk duplicate check failed:", err);
+        // Mark remaining "checking" rows as error.
+        for (const item of items) {
+          if (statuses[item.key] === "checking") statuses[item.key] = "error";
+        }
+        setDuplicateCheckUi((prev) => ({
+          ...prev,
+          checkedCount: items.length,
+          statuses: { ...statuses },
+        }));
+        const duplicateKeys = items
+          .filter((item) => {
+            const s = statuses[item.key];
+            return s === "duplicate" || s === "error";
+          })
+          .map((item) => item.key);
+
+        return { duplicateKeys, statuses };
+      }
+    }
+
+    // Apply bulk results.
+    for (const item of items) {
+      if (statuses[item.key] !== "checking") continue;
+      const nextStatus = existsSet.has(item.code) ? "duplicate" : "ok";
+      statuses[item.key] = nextStatus;
+    }
+
+    setDuplicateCheckUi((prev) => ({
+      ...prev,
+      checkedCount: items.length,
+      statuses: { ...statuses },
+    }));
+
+    const duplicateKeys = items
+      .filter((item) => {
+        const s = statuses[item.key];
+        return s === "duplicate" || s === "error";
+      })
+      .map((item) => item.key);
+
+    setDuplicateCheckUi((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        duplicateKeys,
+        duplicateCount: duplicateKeys.length,
+      };
+    });
+
+    return { duplicateKeys, statuses };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateLines()) {
@@ -794,6 +946,47 @@ export default function AddLocation() {
     openSaveProgress(lines.length);
 
     try {
+      // Step 2: Duplicate code checking (client-side UI + backend existence check)
+      const { duplicateKeys, statuses } = await runDuplicateCheckUi();
+      if (duplicateKeys.length > 0) {
+        setLineErrors((prev) => {
+          const next = { ...prev };
+          for (const key of duplicateKeys) {
+            next[key] = ["duplicate"];
+          }
+          return next;
+        });
+
+        // Scroll the table to the first duplicated line so the user can fix it quickly.
+        setTimeout(() => scrollToLineKey(duplicateKeys[0]), 50);
+
+        const hasError = duplicateKeys.some((k) => statuses?.[k] === "error");
+
+        failSaveProgress(
+          hasError
+            ? "Failed to verify some duplicate location codes."
+            : "Duplicate location code(s) found. Please fix the highlighted lines and try again.",
+          "duplicates"
+        );
+        toast.error(
+          "Duplicate location code(s) found. Please fix the highlighted lines."
+        );
+        return;
+      }
+
+      // Mark duplicates step done and move to next step
+      setSaveProgress((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          steps: prev.steps.map((step) => {
+            if (step.id === "duplicates") return { ...step, status: "done" };
+            if (step.id === "document") return { ...step, status: "active" };
+            return step;
+          }),
+        };
+      });
+
       const token = localStorage.getItem("token");
       const res = await fetch("/api/location-request-documents", {
         method: "POST",
@@ -871,7 +1064,10 @@ export default function AddLocation() {
             </p>
           </div>
 
-          <div className="overflow-auto max-h-[65vh] rounded-xl border border-gray-200">
+          <div
+            ref={linesScrollRef}
+            className="overflow-auto max-h-[65vh] rounded-xl border border-gray-200"
+          >
             <table className="min-w-[1140px] w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-[#107a8b] text-white">
                 <tr>
@@ -904,9 +1100,10 @@ export default function AddLocation() {
                   return (
                     <tr
                       key={line.key}
+                      data-line-key={line.key}
                       className={`border-b border-gray-100 ${
                         errors.has("duplicate")
-                          ? "bg-red-50"
+                          ? "bg-red-100"
                           : checked
                             ? "bg-[#e8f6f8]"
                             : index % 2 === 0
@@ -1141,6 +1338,70 @@ export default function AddLocation() {
                 );
               })}
             </ul>
+
+            {saveProgress.steps.find((s) => s.id === "duplicates")?.status !==
+              "pending" &&
+              duplicateCheckUi && (
+                <div className="px-5 pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[11px] font-semibold text-gray-600">
+                      Checking duplicate location codes
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      {duplicateCheckUi.checkedCount}/{duplicateCheckUi.total}
+                    </p>
+                  </div>
+
+                  {duplicateCheckUi.duplicateCount > 0 && (
+                    <p className="mb-2 text-[11px] font-semibold text-red-600">
+                      Duplicated rows: {duplicateCheckUi.duplicateCount}
+                    </p>
+                  )}
+
+                  <div className="max-h-36 overflow-auto rounded-lg border border-gray-100">
+                    {duplicateCheckUi.items.map((item) => {
+                      const status =
+                        duplicateCheckUi.statuses?.[item.key] ?? "checking";
+
+                      const badge =
+                        status === "ok" ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                            ✓
+                          </span>
+                        ) : status === "duplicate" ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-700 font-bold text-[10px]">
+                            ✕
+                          </span>
+                        ) : status === "error" ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700 font-bold text-[10px]">
+                            !
+                          </span>
+                        ) : (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                            <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                          </span>
+                        );
+
+                      return (
+                        <div
+                          key={item.key}
+                          className="flex items-center justify-between gap-3 px-3 py-1.5 border-b last:border-b-0"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-5 text-center font-semibold text-gray-500 text-[11px]">
+                              {item.lineNo}
+                            </span>
+                            <span className="font-mono text-[10px] text-gray-800 truncate">
+                              {item.code}
+                            </span>
+                          </div>
+                          {badge}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
             {saveProgress.documentNumber && !saveProgress.error && (
               <p className="px-5 pb-2 text-sm font-semibold text-emerald-700">

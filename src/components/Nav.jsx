@@ -396,7 +396,28 @@ export default function Nav() {
             </svg>
           </button>
           {open && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+            <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+              <div className="border-b border-gray-100 px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <i className="bi bi-person-fill text-[#107a8b] text-base shrink-0" />
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {user?.user?.name || "Unknown user"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <i className="bi bi-shield-check text-gray-400 text-sm shrink-0" />
+                  <p className="text-xs text-gray-500 truncate">
+                    {(Array.isArray(user?.roles) ? user.roles.join(", ") : user?.roles) ||
+                      "No role"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <i className="bi bi-person-badge text-[#107a8b] text-sm shrink-0" />
+                  <p className="font-mono text-xs text-[#107a8b] truncate">
+                    {user?.user?.emp_id || "-"}
+                  </p>
+                </div>
+              </div>
               <ul className="py-1 text-sm text-gray-700">
                 {/* Selected Branch with dropdown */}
                 <li className="relative">

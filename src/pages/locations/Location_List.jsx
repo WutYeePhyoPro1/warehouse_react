@@ -4,6 +4,7 @@ import QRCode from "react-qr-code";
 import { useReactToPrint } from "react-to-print";
 import { toast } from "react-hot-toast";
 import { useStateContext } from "../../contexts/stateContext";
+import Pagination from "../../components/Pagination";
 
 export default function LocationList() {
   const { user } = useStateContext();
@@ -25,6 +26,8 @@ export default function LocationList() {
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   // const isOperationAnalystis = user?.roles?.includes("Operation Analystis");
   const [pagination, setPagination] = useState({
@@ -143,6 +146,87 @@ export default function LocationList() {
       });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const allOnPageSelected =
+    locations.length > 0 && selectedLocations.length === locations.length;
+
+  const handleDeleteAll = () => {
+    if (!canDeleteLocation || selectedLocations.length === 0) return;
+    setDeleteError(null);
+    setDeleteAllOpen(true);
+  };
+
+  const confirmDeleteAll = async () => {
+    if (selectedLocations.length === 0) return;
+
+    setIsDeletingAll(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/locations/bulk-delete", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          ids: selectedLocations.map((location) => location.id),
+        }),
+      });
+      const json = await res.json();
+      setDeleteAllOpen(false);
+
+      if (!res.ok) {
+        const firstBlocked = Array.isArray(json.blocked) ? json.blocked[0] : null;
+        const products = Array.isArray(json.linked_products)
+          ? json.linked_products.slice(0, 5)
+          : firstBlocked?.linked_products?.slice(0, 5) || [];
+        setDeleteError({
+          message:
+            json.message ||
+            "Cannot delete the selected locations because they are connected with product code(s).",
+          products,
+          linkedCount: json.linked_count || firstBlocked?.linked_count || products.length,
+          locationName:
+            json.locationName ||
+            firstBlocked?.location_name ||
+            `${selectedLocations.length} selected locations`,
+        });
+        return;
+      }
+
+      toast.success(json.message || "Selected locations deleted.");
+      if (Array.isArray(json.blocked) && json.blocked.length > 0) {
+        setDeleteError({
+          message: json.message,
+          products: json.blocked
+            .flatMap((item) => item.linked_products || [])
+            .slice(0, 5),
+          linkedCount: json.blocked.length,
+          locationName: json.blocked
+            .map((item) => item.location_name)
+            .filter(Boolean)
+            .slice(0, 3)
+            .join(", "),
+        });
+      }
+
+      setSelectedLocations([]);
+      await fetchLocationData(pagination.current_page);
+    } catch (err) {
+      console.error(err);
+      setDeleteAllOpen(false);
+      setDeleteError({
+        message: "Failed to delete selected locations.",
+        products: [],
+        linkedCount: 0,
+        locationName: `${selectedLocations.length} selected locations`,
+      });
+    } finally {
+      setIsDeletingAll(false);
     }
   };
 
@@ -280,15 +364,14 @@ export default function LocationList() {
               placeholder="Enter Size"
             />
           </div>
-          <div className="w-full flex items-end">
+          <div className="w-full flex items-end gap-2">
             <button
               onClick={handleSelectAll}
               disabled={isLoading || locations.length === 0}
-              className="w-full mt-2 bg-[#107a8b] text-white py-2 rounded-lg hover:bg-[#0d6e7b] disabled:opacity-50"
+              className="flex-1 mt-2 bg-[#107a8b] text-white py-2 rounded-lg hover:bg-[#0d6e7b] disabled:opacity-50"
             >
-              {selectedLocations.length === locations.length &&
-              locations.length > 0
-                ? "Unselect All"
+              {allOnPageSelected
+                ? `Unselect All (${selectedLocations.length})`
                 : "Select All"}
             </button>
           </div>
@@ -316,16 +399,71 @@ export default function LocationList() {
       </div>
 
       <div className="p-4 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-700">
+            <span className="font-semibold text-[#107a8b]">
+              {pagination.total.toLocaleString()}
+            </span>{" "}
+            {pagination.total === 1 ? "location" : "locations"}
+            {!isLoading && locations.length > 0 && (
+              <span className="text-gray-500">
+                {" "}
+                · showing {locations.length} on this page
+              </span>
+            )}
+          </p>
+          {selectedLocations.length > 0 && (
+            <div className="flex items-center gap-3">
+              <p className="rounded-lg bg-[#107a8b]/10 px-3 py-1.5 text-sm font-semibold text-[#107a8b]">
+                Selected: {selectedLocations.length}
+              </p>
+              {canDeleteLocation && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAll}
+                  disabled={isLoading || isDeletingAll}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                >
+                  Delete All ({selectedLocations.length})
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {isLoading && (
-          <p className="p-4 text-center text-gray-500">Loading…</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {Array.from({ length: pagination.per_page || 20 }).map((_, index) => (
+              <div
+                key={`location-skeleton-${index}`}
+                className="border p-4 rounded-xl shadow bg-white animate-pulse"
+              >
+                <div className="flex justify-between items-center sm:hidden">
+                  <div className="space-y-2 w-full pr-4">
+                    <div className="h-4 w-3/4 rounded bg-gray-200" />
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 rounded bg-gray-200" />
+                      <div className="h-3 w-16 rounded bg-gray-200" />
+                    </div>
+                  </div>
+                  <div className="h-16 w-16 shrink-0 rounded bg-gray-200" />
+                </div>
+                <div className="hidden sm:flex items-center gap-3">
+                  <div className="h-4 w-4 rounded bg-gray-200" />
+                  <div className="h-4 w-40 rounded bg-gray-200" />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {!isLoading && locations.length === 0 && (
           <p className="p-4 text-center text-gray-500">No locations found.</p>
         )}
 
+        {!isLoading && locations.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {!isLoading && locations.map((location) => (
+          {locations.map((location) => (
             <div
               key={location.id}
               className="border p-4 rounded-xl shadow bg-white"
@@ -385,6 +523,7 @@ export default function LocationList() {
             </div>
           ))}
         </div>
+        )}
 
         {/* Print Button */}
 
@@ -394,7 +533,7 @@ export default function LocationList() {
               className="bg-[#128080] text-white px-8 py-3 rounded-lg text-lg font-medium shadow hover:bg-[#0d6e7b]"
               onClick={handlePrint}
             >
-              Print Selected
+              Print Selected ({selectedLocations.length})
             </button>
           </div>
         )}
@@ -514,26 +653,51 @@ export default function LocationList() {
       </div>
       )}
 
-      {/* Pagination */}
-      <div className="mt-6 flex justify-center gap-4">
-        <button
-          disabled={isLoading || pagination.current_page === 1}
-          onClick={() => handlePageChange(pagination.current_page - 1)}
-          className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-        >
-          Previous
-        </button>
-        <button
-          disabled={
-            isLoading ||
-            pagination.current_page * pagination.per_page >= pagination.total
-          }
-          onClick={() => handlePageChange(pagination.current_page + 1)}
-          className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-        >
-          Next
-        </button>
-      </div>
+      <Pagination
+        currentPage={pagination.current_page}
+        total={pagination.total}
+        perPage={pagination.per_page}
+        onPageChange={handlePageChange}
+        isLoading={isLoading}
+      />
+
+      {deleteAllOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="border-b px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Confirm Delete All
+              </h3>
+            </div>
+            <div className="px-6 py-4 space-y-2">
+              <p className="text-sm text-gray-700">
+                Delete all {selectedLocations.length} selected locations?
+              </p>
+              <p className="text-xs text-gray-500">
+                Locations with stock products will be skipped.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setDeleteAllOpen(false)}
+                disabled={isDeletingAll}
+                className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAll}
+                disabled={isDeletingAll}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeletingAll ? "Deleting…" : "Yes, Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

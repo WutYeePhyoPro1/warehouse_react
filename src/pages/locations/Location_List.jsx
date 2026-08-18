@@ -16,7 +16,8 @@ export default function LocationList() {
   const [zone, setZone] = useState("");
   const [row, setRow] = useState("");
   const [bay, setBay] = useState("");
-  const [size, setSize] = useState("");
+  const [level, setLevel] = useState("");
+  const [side, setSide] = useState("");
   const [filterBranchId, setFilterBranchId] = useState(
     () => (branchId != null ? String(branchId) : "all")
   );
@@ -239,7 +240,8 @@ export default function LocationList() {
         ...(zone ? { zone } : {}),
         ...(row ? { row } : {}),
         ...(bay ? { bay } : {}),
-        ...(size ? { level: size } : {}),
+        ...(level ? { level } : {}),
+        ...(side ? { side } : {}),
         ...(canFilterBranch && filterBranchId
           ? { branch_id: filterBranchId }
           : {}),
@@ -286,7 +288,7 @@ export default function LocationList() {
 
   useEffect(() => {
     fetchLocationData();
-  }, [zone, row, bay, size, branchId, filterBranchId, canFilterBranch]);
+  }, [zone, row, bay, level, side, branchId, filterBranchId, canFilterBranch]);
   
   const printUser =
   user?.user?.emp_id === "003-001055" ||
@@ -355,14 +357,26 @@ export default function LocationList() {
             />
           </div>
           <div className="w-full">
-            <label className="font-medium block">Size</label>
+            <label className="font-medium block">Level</label>
             <input
               type="text"
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
               className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4"
-              placeholder="Enter Size"
+              placeholder="Enter Level"
             />
+          </div>
+          <div className="w-full">
+            <label className="font-medium block">F/B</label>
+            <select
+              value={side}
+              onChange={(e) => setSide(e.target.value)}
+              className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4 bg-white"
+            >
+              <option value="">All</option>
+              <option value="F">F</option>
+              <option value="B">B</option>
+            </select>
           </div>
           <div className="w-full flex items-end gap-2">
             <button

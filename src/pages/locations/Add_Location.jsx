@@ -1085,9 +1085,9 @@ export default function AddLocation() {
                   <th className="px-2 py-2 text-left min-w-[180px]">Location Type</th>
                   <th className="px-2 py-2 text-left min-w-[90px]">Zone</th>
                   <th className="px-2 py-2 text-left min-w-[90px]">Row</th>
+                  <th className="px-2 py-2 text-left min-w-[100px]">F/B</th>
                   <th className="px-2 py-2 text-left min-w-[90px]">Bay</th>
                   <th className="px-2 py-2 text-left min-w-[90px]">Size</th>
-                  <th className="px-2 py-2 text-left min-w-[100px]">F/B</th>
                   <th className="px-2 py-2 text-left min-w-[180px]">Preview</th>
                   <th className="px-2 py-2 text-center w-16">Del</th>
                 </tr>
@@ -1170,6 +1170,17 @@ export default function AddLocation() {
                       <td className="px-1 py-1 align-middle">
                         <SelectField
                           compact
+                          options={FB_OPTIONS}
+                          value={line.side}
+                          onChange={(val) =>
+                            updateLine(line.key, { side: val })
+                          }
+                          hasError={errors.has("fb")}
+                        />
+                      </td>
+                      <td className="px-1 py-1 align-middle">
+                        <SelectField
+                          compact
                           options={NUMBER_OPTIONS}
                           value={line.bay_id}
                           onChange={(val) =>
@@ -1187,17 +1198,6 @@ export default function AddLocation() {
                             updateLine(line.key, { level_id: val })
                           }
                           hasError={errors.has("size")}
-                        />
-                      </td>
-                      <td className="px-1 py-1 align-middle">
-                        <SelectField
-                          compact
-                          options={FB_OPTIONS}
-                          value={line.side}
-                          onChange={(val) =>
-                            updateLine(line.key, { side: val })
-                          }
-                          hasError={errors.has("fb")}
                         />
                       </td>
                       <td className="px-2 py-1.5 align-middle">

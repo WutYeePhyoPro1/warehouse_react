@@ -395,9 +395,9 @@ export default function RequestLocationDetail() {
                   <th className="px-3 py-2 text-left">S/W</th>
                   <th className="px-3 py-2 text-left">Zone</th>
                   <th className="px-3 py-2 text-left">Row</th>
-                  <th className="px-3 py-2 text-left">Bay</th>
-                  <th className="px-3 py-2 text-left">Size</th>
                   <th className="px-3 py-2 text-left">F/B</th>
+                  <th className="px-3 py-2 text-left">Bay</th>
+                  <th className="px-3 py-2 text-left">Level</th>
                   {canAction && (
                     <th className="px-3 py-2 text-center">Actions</th>
                   )}
@@ -426,11 +426,11 @@ export default function RequestLocationDetail() {
                     </td>
                     <td className="px-3 py-2">{line.zone?.name || "-"}</td>
                     <td className="px-3 py-2">{line.row?.name || "-"}</td>
-                    <td className="px-3 py-2">{line.bay?.name || "-"}</td>
-                    <td className="px-3 py-2">{line.level?.name || "-"}</td>
                     <td className="px-3 py-2">
                       {!line.side || line.side === "Natural" ? "None" : line.side}
                     </td>
+                    <td className="px-3 py-2">{line.bay?.name || "-"}</td>
+                    <td className="px-3 py-2">{line.level?.name || "-"}</td>
                     {canAction && (
                       <td className="px-3 py-2 text-center whitespace-nowrap">
                         <button
@@ -655,22 +655,6 @@ export default function RequestLocationDetail() {
                 />
               </label>
               <label className="text-sm">
-                <span className="mb-1 block text-gray-600">F/B</span>
-                <select
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  value={editForm.side}
-                  onChange={(e) =>
-                    setEditForm((prev) => ({ ...prev, side: e.target.value }))
-                  }
-                >
-                  {FB_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
                 <span className="mb-1 block text-gray-600">Row</span>
                 <select
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -680,6 +664,22 @@ export default function RequestLocationDetail() {
                   }
                 >
                   {NUMBER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-600">F/B</span>
+                <select
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  value={editForm.side}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, side: e.target.value }))
+                  }
+                >
+                  {FB_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -703,7 +703,7 @@ export default function RequestLocationDetail() {
                 </select>
               </label>
               <label className="text-sm">
-                <span className="mb-1 block text-gray-600">Size</span>
+                <span className="mb-1 block text-gray-600">Level</span>
                 <select
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   value={editForm.level_id}

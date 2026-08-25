@@ -347,6 +347,18 @@ export default function LocationList() {
             />
           </div>
           <div className="w-full">
+            <label className="font-medium block">F/B</label>
+            <select
+              value={side}
+              onChange={(e) => setSide(e.target.value)}
+              className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4 bg-white"
+            >
+              <option value="">All</option>
+              <option value="F">F</option>
+              <option value="B">B</option>
+            </select>
+          </div>
+          <div className="w-full">
             <label className="font-medium block">Bay</label>
             <input
               type="text"
@@ -365,18 +377,6 @@ export default function LocationList() {
               className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4"
               placeholder="Enter Level"
             />
-          </div>
-          <div className="w-full">
-            <label className="font-medium block">F/B</label>
-            <select
-              value={side}
-              onChange={(e) => setSide(e.target.value)}
-              className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4 bg-white"
-            >
-              <option value="">All</option>
-              <option value="F">F</option>
-              <option value="B">B</option>
-            </select>
           </div>
           <div className="w-full flex items-end gap-2">
             <button

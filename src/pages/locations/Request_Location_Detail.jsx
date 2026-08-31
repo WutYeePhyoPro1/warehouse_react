@@ -427,7 +427,9 @@ export default function RequestLocationDetail() {
                     <td className="px-3 py-2">{line.zone?.name || "-"}</td>
                     <td className="px-3 py-2">{line.row?.name || "-"}</td>
                     <td className="px-3 py-2">
-                      {!line.side || line.side === "Natural" ? "None" : line.side}
+                      {!line.side || line.side === "Natural" || line.side === "None"
+                        ? ""
+                        : line.side}
                     </td>
                     <td className="px-3 py-2">{line.bay?.name || "-"}</td>
                     <td className="px-3 py-2">{line.level?.name || "-"}</td>

@@ -18,6 +18,9 @@ export default function LocationList() {
   const [bay, setBay] = useState("");
   const [level, setLevel] = useState("");
   const [side, setSide] = useState("");
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [matchedDocuments, setMatchedDocuments] = useState([]);
+  const [documentNotFound, setDocumentNotFound] = useState(false);
   const [filterBranchId, setFilterBranchId] = useState(
     () => (branchId != null ? String(branchId) : "all")
   );
@@ -93,7 +96,7 @@ export default function LocationList() {
   };
 
   const handleDeleteLocation = (location) => {
-    if (!canDeleteLocation || !location?.id) return;
+    if (!canDeleteLocation || !location?.id || location.id < 0 || location.pending) return;
     setDeleteError(null);
     setDeleteTarget(location);
   };
@@ -242,6 +245,7 @@ export default function LocationList() {
         ...(bay ? { bay } : {}),
         ...(level ? { level } : {}),
         ...(side ? { side } : {}),
+        ...(documentNumber.trim() ? { document_number: documentNumber.trim() } : {}),
         ...(canFilterBranch && filterBranchId
           ? { branch_id: filterBranchId }
           : {}),
@@ -272,6 +276,12 @@ export default function LocationList() {
       }
 
       setLocations(uniqueLocations);
+      setMatchedDocuments(
+        Array.isArray(json.document_numbers) ? json.document_numbers : []
+      );
+      setDocumentNotFound(
+        documentNumber.trim() !== "" && json.document_match === false
+      );
       setPagination({
         current_page: json.data.current_page ?? 1,
         total: json.data.total ?? uniqueLocations.length,
@@ -288,7 +298,7 @@ export default function LocationList() {
 
   useEffect(() => {
     fetchLocationData();
-  }, [zone, row, bay, level, side, branchId, filterBranchId, canFilterBranch]);
+  }, [zone, row, bay, level, side, documentNumber, branchId, filterBranchId, canFilterBranch]);
   
   const printUser =
   user?.user?.emp_id === "003-001055" ||
@@ -326,6 +336,16 @@ export default function LocationList() {
               </select>
             </div>
           )}
+          <div className="w-full">
+            <label className="font-medium block">Document No</label>
+            <input
+              type="text"
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+              className="py-2 rounded-lg mt-2 border border-primary text-sm shadow-sm w-full px-4"
+              placeholder="e.g. LRLANW20260815-0001"
+            />
+          </div>
           <div className="w-full">
             <label className="font-medium block">Zone</label>
             <input
@@ -419,10 +439,18 @@ export default function LocationList() {
               {pagination.total.toLocaleString()}
             </span>{" "}
             {pagination.total === 1 ? "location" : "locations"}
+            {matchedDocuments.length > 0 && (
+              <span className="text-gray-500">
+                {" "}
+                · document: {matchedDocuments.join(", ")}
+              </span>
+            )}
             {!isLoading && locations.length > 0 && (
               <span className="text-gray-500">
                 {" "}
-                · showing {locations.length} on this page
+                · {documentNumber.trim()
+                  ? `showing all ${locations.length}`
+                  : `showing ${locations.length} on this page`}
               </span>
             )}
           </p>
@@ -472,7 +500,11 @@ export default function LocationList() {
         )}
 
         {!isLoading && locations.length === 0 && (
-          <p className="p-4 text-center text-gray-500">No locations found.</p>
+          <p className="p-4 text-center text-gray-500">
+            {documentNotFound
+              ? "No document found for that document number."
+              : "No locations found."}
+          </p>
         )}
 
         {!isLoading && locations.length > 0 && (
@@ -486,6 +518,9 @@ export default function LocationList() {
               <div className="flex justify-between items-center sm:hidden">
                 <div className="space-y-2">
                   <p className="font-bold">{location.location_name}</p>
+                  {location.pending ? (
+                    <p className="text-xs font-medium text-amber-700">Pending approval</p>
+                  ) : null}
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input
                       type="checkbox"
@@ -495,7 +530,7 @@ export default function LocationList() {
                     />
                     Select
                   </label>
-                  {canDeleteLocation && (
+                  {canDeleteLocation && !location.pending && location.id > 0 && (
                     <button
                       type="button"
                       onClick={() => handleDeleteLocation(location)}
@@ -521,8 +556,13 @@ export default function LocationList() {
                     />
                   </label>
                   <p className="font-bold break-all">{location.location_name}</p>
+                  {location.pending ? (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                      Pending
+                    </span>
+                  ) : null}
                 </div>
-                {canDeleteLocation && (
+                {canDeleteLocation && !location.pending && location.id > 0 && (
                   <button
                     type="button"
                     onClick={() => handleDeleteLocation(location)}
@@ -673,6 +713,7 @@ export default function LocationList() {
         perPage={pagination.per_page}
         onPageChange={handlePageChange}
         isLoading={isLoading}
+        hideWhenSinglePage={documentNumber.trim() !== ""}
       />
 
       {deleteAllOpen && (

@@ -75,9 +75,12 @@ const HEADER_ALIASES = {
   frontback: "F/B",
   branchshortcode: "BranchShort",
   branchshortname: "BranchShort",
+  branchshort: "BranchShort",
   branchshortc: "BranchShort",
   shortcode: "BranchShort",
   shortname: "BranchShort",
+  no: "No",
+  type: "TypeLetter",
   locationcode: "LocationCode",
   locationname: "LocationCode",
   loccode: "LocationCode",
@@ -201,10 +204,10 @@ const isBlankLine = (line) =>
   !line.level_id &&
   isNoneSide(line.side);
 
-const emptyLine = (branchId = null) => ({
+const emptyLine = () => ({
   key: `${Date.now()}-${Math.random()}`,
-  branch_id: branchId,
-  location_category: "RG_WAREHOUSE",
+  branch_id: null,
+  location_category: null,
   zone_id: null,
   row_id: null,
   bay_id: null,
@@ -229,7 +232,11 @@ const buildPreviewCode = (line, branches) => {
     cellText(line.excel_short_name).toUpperCase() ||
     branch?.short_name ||
     "?";
-  const letter = line.location_category === "RG_WAREHOUSE" ? "W" : "S";
+  const letter = !line.location_category
+    ? "?"
+    : line.location_category === "RG_WAREHOUSE"
+      ? "W"
+      : "S";
   const zone = typeof line.zone_id === "string"
     ? line.zone_id
     : line.zone_id
@@ -263,6 +270,30 @@ const formatSaveError = (json) => {
     return "Failed to save location request. Please try again.";
   }
   return text;
+};
+
+const bulkCheckLocationCodesExists = async (locationNames) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch("/api/location-check-bulk", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      location_names: locationNames,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  return Array.isArray(json?.exists) ? json.exists : [];
 };
 
 const SelectField = ({
@@ -327,12 +358,15 @@ export default function AddLocation() {
 
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(true);
-  const [lines, setLines] = useState([emptyLine(activeBranchId)]);
+  const [lines, setLines] = useState([emptyLine()]);
   const [selectedKeys, setSelectedKeys] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [lineErrors, setLineErrors] = useState({});
   const [saveProgress, setSaveProgress] = useState(null);
   const [duplicateCheckUi, setDuplicateCheckUi] = useState(null);
+  const [existingDuplicateKeys, setExistingDuplicateKeys] = useState(
+    () => new Set()
+  );
   const fileInputRef = useRef(null);
   const linesScrollRef = useRef(null);
 
@@ -371,20 +405,6 @@ export default function AddLocation() {
         const json = await res.json();
         const list = json.data || [];
         setBranches(list);
-
-        if (activeBranchId && list.some((b) => b.id === activeBranchId)) {
-          setLines((prev) =>
-            prev.map((line, idx) =>
-              idx === 0 ? { ...line, branch_id: activeBranchId } : line
-            )
-          );
-        } else if (list.length === 1) {
-          setLines((prev) =>
-            prev.map((line, idx) =>
-              idx === 0 ? { ...line, branch_id: list[0].id } : line
-            )
-          );
-        }
       } catch (err) {
         console.error(err);
         toast.error("Failed to load branches.");
@@ -394,7 +414,7 @@ export default function AddLocation() {
     };
 
     fetchBranches();
-  }, [activeBranchId]);
+  }, []);
 
   const formattedBranches = useMemo(
     () =>
@@ -418,14 +438,75 @@ export default function AddLocation() {
   }, [lines]);
 
   const docPreview = useMemo(() => {
-    const branch = branches.find((b) => b.id === activeBranchId) || branches[0];
+    const lineWithBranch = lines.find((line) => line.branch_id);
+    const branch =
+      branches.find((b) => String(b.id) === String(lineWithBranch?.branch_id)) ||
+      branches.find((b) => b.id === activeBranchId) ||
+      branches[0];
     const short = branch?.short_name || "???";
     const date = new Date();
     const ymd = `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(
       date.getDate()
     )}`;
     return `LR${short}${ymd}-????`;
-  }, [branches, activeBranchId]);
+  }, [lines, branches, activeBranchId]);
+
+  const inDocumentDuplicateKeys = useMemo(() => {
+    const seen = new Map();
+    const dupes = new Set();
+    lines.forEach((line) => {
+      const code = buildPreviewCode(line, branches);
+      if (!code || code.includes("?")) return;
+      if (seen.has(code)) dupes.add(line.key);
+      else seen.set(code, line.key);
+    });
+    return dupes;
+  }, [lines, branches]);
+
+  const duplicateLineKeys = useMemo(() => {
+    const dupes = new Set(inDocumentDuplicateKeys);
+    existingDuplicateKeys.forEach((key) => dupes.add(key));
+    return dupes;
+  }, [inDocumentDuplicateKeys, existingDuplicateKeys]);
+
+  useEffect(() => {
+    const items = lines
+      .map((line) => ({
+        key: line.key,
+        code: buildPreviewCode(line, branches),
+      }))
+      .filter((item) => item.code && !item.code.includes("?"));
+
+    if (!items.length) {
+      setExistingDuplicateKeys(new Set());
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const uniqueCodes = [...new Set(items.map((item) => item.code))];
+        const exists = await bulkCheckLocationCodesExists(uniqueCodes);
+        if (cancelled) return;
+
+        const existsSet = new Set(exists);
+        const dupes = new Set();
+        items.forEach(({ key, code }) => {
+          if (existsSet.has(code)) dupes.add(key);
+        });
+        setExistingDuplicateKeys(dupes);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Duplicate code check failed:", err);
+        }
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [lines, branches]);
 
   const updateLine = (key, patch) => {
     setLines((prev) =>
@@ -458,7 +539,7 @@ export default function AddLocation() {
   };
 
   const addLine = () => {
-    setLines((prev) => [...prev, emptyLine(activeBranchId)]);
+    setLines((prev) => [...prev, emptyLine()]);
   };
 
   const removeLine = (key) => {
@@ -503,26 +584,38 @@ export default function AddLocation() {
       const remaining = prev.filter((line) => !selectedKeys.has(line.key));
       return remaining.length > 0
         ? remaining
-        : [emptyLine(activeBranchId)];
+        : [emptyLine()];
     });
     setSelectedKeys(new Set());
     setLineErrors({});
   };
 
-  const downloadExcelTemplate = () => {
-    const sampleBranch =
-      branches.find((b) => b.id === activeBranchId)?.short_name ||
-      branches[0]?.short_name ||
-      "LAN";
-    const rows = [
-      EXCEL_HEADERS,
-      [sampleBranch, "RG Warehouse", "A", "01", "01", "01", "None"],
-      [sampleBranch, "Top stock_Middle shelve & Wall shelve", "B", "02", "03", "01", "F"],
-    ];
-    const sheet = XLSX.utils.aoa_to_sheet(rows);
-    const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, "Locations");
-    XLSX.writeFile(book, "location_request_template.xlsx");
+  const removeDuplicateLines = () => {
+    if (duplicateLineKeys.size === 0) {
+      toast.error("No duplicate location codes found.");
+      return;
+    }
+
+    setLines((prev) => {
+      const remaining = prev.filter((line) => !duplicateLineKeys.has(line.key));
+      return remaining.length > 0 ? remaining : [emptyLine()];
+    });
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      duplicateLineKeys.forEach((key) => next.delete(key));
+      return next;
+    });
+    setLineErrors((prev) => {
+      const next = { ...prev };
+      duplicateLineKeys.forEach((key) => delete next[key]);
+      return next;
+    });
+    setExistingDuplicateKeys(new Set());
+    toast.success(
+      `Removed ${duplicateLineKeys.size} duplicate line${
+        duplicateLineKeys.size === 1 ? "" : "s"
+      }.`
+    );
   };
 
   const mapExcelRowsToLines = (rows) => {
@@ -540,7 +633,7 @@ export default function AddLocation() {
     const missing = EXCEL_HEADERS.filter((h) => colIndex[h] === undefined);
     if (missing.length) {
       throw new Error(
-        `Missing columns: ${missing.join(", ")}. Use Download Template.`
+        `Missing columns: ${missing.join(", ")}.`
       );
     }
 
@@ -573,9 +666,8 @@ export default function AddLocation() {
       const branch_id = excelBranch
         ? resolveBranchId(branchRaw, branches) ||
           resolveBranchId(branchShortRaw, branches)
-        : activeBranchId || null;
-      const location_category =
-        resolveLocationType(typeRaw) || "RG_WAREHOUSE";
+        : null;
+      const location_category = resolveLocationType(typeRaw);
       const zone_id = resolveZoneId(zoneRaw);
       const row_id = parseNumberField(rowRaw);
       const bay_id = parseNumberField(bayRaw);
@@ -785,30 +877,6 @@ export default function AddLocation() {
         }),
       };
     });
-  };
-
-  const bulkCheckLocationCodesExists = async (locationNames) => {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch("/api/location-check-bulk", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        location_names: locationNames,
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const json = await res.json();
-    return Array.isArray(json?.exists) ? json.exists : [];
   };
 
   const runDuplicateCheckUi = async () => {
@@ -1097,12 +1165,14 @@ export default function AddLocation() {
                   const errors = new Set(lineErrors[line.key] || []);
                   const preview = buildPreviewCode(line, branches);
                   const checked = selectedKeys.has(line.key);
+                  const isDuplicate =
+                    errors.has("duplicate") || duplicateLineKeys.has(line.key);
                   return (
                     <tr
                       key={line.key}
                       data-line-key={line.key}
                       className={`border-b border-gray-100 ${
-                        errors.has("duplicate")
+                        isDuplicate
                           ? "bg-red-100"
                           : checked
                             ? "bg-[#e8f6f8]"
@@ -1248,17 +1318,18 @@ export default function AddLocation() {
               </button>
               <button
                 type="button"
-                onClick={downloadExcelTemplate}
-                className="rounded-lg border border-[#107a8b] px-3 py-1.5 text-sm font-semibold text-[#107a8b] hover:bg-[#f0f9fa]"
-              >
-                Download Template
-              </button>
-              <button
-                type="button"
                 onClick={addLine}
                 className="rounded-lg border border-[#107a8b] px-3 py-1.5 text-sm font-semibold text-[#107a8b] hover:bg-[#f0f9fa]"
               >
                 + Add Line
+              </button>
+              <button
+                type="button"
+                onClick={removeDuplicateLines}
+                disabled={duplicateLineKeys.size === 0}
+                className="rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-600 hover:bg-orange-50 disabled:opacity-40"
+              >
+                Delete Duplicate Codes ({duplicateLineKeys.size})
               </button>
               <button
                 type="button"

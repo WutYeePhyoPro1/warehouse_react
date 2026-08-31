@@ -54,8 +54,12 @@ export default function Pagination({
   perPage,
   onPageChange,
   isLoading = false,
+  hideWhenSinglePage = false,
 }) {
   const lastPage = Math.max(1, Math.ceil((total || 0) / (perPage || 1)));
+  if (hideWhenSinglePage && lastPage <= 1) {
+    return null;
+  }
   const pageItems = getPageItems(currentPage, lastPage);
   const isFirstPage = currentPage <= 1;
   const isLastPage = currentPage >= lastPage;

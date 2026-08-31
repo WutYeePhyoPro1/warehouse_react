@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { useStateContext } from "../../contexts/stateContext";
 import LocationRequestStatusBadge from "../../components/LocationRequestStatusBadge";
 import Pagination from "../../components/Pagination";
+import RequirePermission from "../../components/RequirePermission";
+import { REQUEST_LOCATION_PERMISSION } from "../../utils/permissions";
 
 const ViewAction = ({ id }) => (
   <Link to={`/location_request/${id}`} title="View">
@@ -288,6 +290,7 @@ export default function RequestLocationList() {
     (canFilterBranch && filterBranchId !== "all" && filterBranchId !== String(branchId ?? ""));
 
   return (
+    <RequirePermission permission={REQUEST_LOCATION_PERMISSION}>
     <>
       <div className="flex justify-between items-center me-2 md:me-5 shadow p-4 mx-4 mt-2">
         <h2 className="font-semibold text-gray-800">Location Request Documents</h2>
@@ -470,5 +473,6 @@ export default function RequestLocationList() {
         isLoading={isLoading}
       />
     </>
+    </RequirePermission>
   );
 }

@@ -4,6 +4,8 @@ import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { useStateContext } from "../../contexts/stateContext";
+import RequirePermission from "../../components/RequirePermission";
+import { REQUEST_LOCATION_PERMISSION } from "../../utils/permissions";
 
 const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -1097,6 +1099,7 @@ export default function AddLocation() {
   };
 
   return (
+    <RequirePermission permission={REQUEST_LOCATION_PERMISSION}>
     <form onSubmit={handleSubmit} className="md:bg-gray-200 md:p-[12px]">
       <div className="space-y-4 pb-4 md:w-[98%] md:m-auto border border-[#107a8b] shadow rounded-2xl bg-[#107a8b]">
         <div className="h-12 flex items-center justify-between rounded px-4">
@@ -1507,5 +1510,6 @@ export default function AddLocation() {
         </div>
       )}
     </form>
+    </RequirePermission>
   );
 }

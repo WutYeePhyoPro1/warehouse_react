@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useStateContext } from "../../contexts/stateContext";
 import LocationRequestStatusBadge from "../../components/LocationRequestStatusBadge";
+import RequirePermission from "../../components/RequirePermission";
+import { REQUEST_LOCATION_PERMISSION } from "../../utils/permissions";
 
 const formatDate = (value) => {
   if (!value) return "-";
@@ -334,6 +336,7 @@ export default function RequestLocationDetail() {
   }
 
   return (
+    <RequirePermission permission={REQUEST_LOCATION_PERMISSION}>
     <div className="max-w-6xl mx-auto p-6 space-y-4">
       <div className="bg-white shadow-md rounded-xl overflow-hidden">
         <div className="bg-[#107a8b] px-6 py-4">
@@ -752,5 +755,6 @@ export default function RequestLocationDetail() {
         </div>
       )}
     </div>
+    </RequirePermission>
   );
 }

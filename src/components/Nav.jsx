@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useStateContext } from "../contexts/stateContext";
 import { toast } from "react-hot-toast";
+import { canViewRequestLocation } from "../utils/permissions";
 
 export default function Nav() {
   const { user, setUser, setToken } = useStateContext();
@@ -17,6 +18,7 @@ export default function Nav() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const isLocationApprover = user?.user?.emp_id === "000-000167";
+  const showRequestLocation = canViewRequestLocation(user);
 
   // Fetch branches
   useEffect(() => {
@@ -361,6 +363,7 @@ export default function Nav() {
                   )}
                 </div>
 
+                {showRequestLocation && (
                 <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5">
                   <button
                     type="button"
@@ -373,6 +376,7 @@ export default function Nav() {
                     View all requests
                   </button>
                 </div>
+                )}
               </div>
             )}
           </div>

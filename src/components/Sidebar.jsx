@@ -54,6 +54,7 @@ export default function Sidebar() {
     } else if (path.includes("stock_in_lists") || path.includes("create_stockin")) setActiveItem("stock-in");
     else if (path.includes("stock_out_lists") || path.includes("create_stockout")) setActiveItem("stock-out");
     else if (path.includes("transfer_lists") || path.includes("create_transfer")) setActiveItem("transfer");
+    else if (path.includes("location_types")) setActiveItem("location-type");
     else if (path.includes("location_requests") || path.includes("location_request")) setActiveItem("location-request");
     else if (path.includes("locations") || path.includes("create_location") || path.includes("add_location")) setActiveItem("location");
     else if (path.includes("stock_balance_lists"))
@@ -436,6 +437,45 @@ export default function Sidebar() {
               </Link>
             </li>
             )}
+            <li
+              className={`rounded-xl ${
+                activeItem === "location-type" ? "bg-primary" : ""
+              }`}
+            >
+              <Link
+                onClick={() => {
+                  setActiveItem("location-type");
+                  handleCloseSidebar();
+                }}
+                to="location_types"
+                className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white dark:hover:bg-gray-700 group"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className={`size-6 ${
+                    activeItem === "location-type" ? "text-white" : "text-primary"
+                  }`}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
+                  />
+                </svg>
+
+                <span
+                  className={`ms-3 font-bold ${
+                    activeItem === "location-type" ? "text-white" : "text-primary"
+                  }`}
+                >
+                  Location Type
+                </span>
+              </Link>
+            </li>
             
             <li onClick={handleInstall} className="cursor-pointer">
             <div className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white dark:hover:bg-gray-700 group shadow">

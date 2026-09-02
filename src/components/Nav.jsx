@@ -153,6 +153,8 @@ export default function Nav() {
         return "Transfer Lists";
       case "/locations":
         return "Location Lists";
+      case "/location_types":
+        return "Location Types";
       case "/location_requests":
         return "Request Location";
       case "/create_location":

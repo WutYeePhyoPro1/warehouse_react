@@ -25,7 +25,7 @@ const FB_OPTIONS = [
   { value: "None", label: "None" },
 ];
 
-const LOCATION_TYPE_OPTIONS = [
+const FALLBACK_LOCATION_TYPE_OPTIONS = [
   { value: "TOP_MID_WALL", label: "Top stock_Middle shelve & Wall shelve" },
   { value: "PROMOTION_ZONE_GF", label: "Promotion zone,Ground floor" },
   { value: "STATIONARY_DIGITAL", label: "Stationary & Digital-Displays" },
@@ -141,24 +141,24 @@ const resolveBranchId = (raw, branches) => {
   return null;
 };
 
-const resolveLocationType = (raw) => {
+const resolveLocationType = (raw, options = FALLBACK_LOCATION_TYPE_OPTIONS) => {
   const text = cellText(raw);
   if (!text) return null;
   const lower = text.toLowerCase();
   const compact = lower.replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
   if (compact.length < 2) return null;
 
-  const byValue = LOCATION_TYPE_OPTIONS.find(
+  const byValue = options.find(
     (opt) => opt.value.toLowerCase() === lower
   );
   if (byValue) return byValue.value;
 
-  const byLabel = LOCATION_TYPE_OPTIONS.find(
+  const byLabel = options.find(
     (opt) => opt.label.toLowerCase() === lower
   );
   if (byLabel) return byLabel.value;
 
-  const byCompact = LOCATION_TYPE_OPTIONS.find(
+  const byCompact = options.find(
     (opt) =>
       opt.label.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "") ===
       compact
@@ -359,6 +359,9 @@ export default function AddLocation() {
   const activeBranchId = user?.user?.branch_id;
 
   const [branches, setBranches] = useState([]);
+  const [locationTypeOptions, setLocationTypeOptions] = useState(
+    FALLBACK_LOCATION_TYPE_OPTIONS
+  );
   const [loadingBranches, setLoadingBranches] = useState(true);
   const [lines, setLines] = useState([emptyLine()]);
   const [selectedKeys, setSelectedKeys] = useState(() => new Set());
@@ -391,6 +394,30 @@ export default function AddLocation() {
       // ignore scroll errors
     }
   };
+
+  useEffect(() => {
+    const fetchLocationTypes = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/location-types?active_only=1", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = (json.data || []).map((t) => ({
+          value: t.code,
+          label: t.name,
+        }));
+        if (list.length > 0) setLocationTypeOptions(list);
+      } catch (err) {
+        console.error("Failed to load location types:", err);
+      }
+    };
+    fetchLocationTypes();
+  }, []);
 
   useEffect(() => {
     const fetchBranches = async () => {
@@ -669,7 +696,8 @@ export default function AddLocation() {
         ? resolveBranchId(branchRaw, branches) ||
           resolveBranchId(branchShortRaw, branches)
         : null;
-      const location_category = resolveLocationType(typeRaw);
+      const location_category =
+        resolveLocationType(typeRaw, locationTypeOptions) || "RG_WAREHOUSE";
       const zone_id = resolveZoneId(zoneRaw);
       const row_id = parseNumberField(rowRaw);
       const bay_id = parseNumberField(bayRaw);
@@ -693,7 +721,7 @@ export default function AddLocation() {
       ) {
         warnings.push(`Row ${excelRow}: unknown branch "${excelBranch}"`);
       }
-      if (cellText(typeRaw) && !resolveLocationType(typeRaw)) {
+      if (cellText(typeRaw) && !resolveLocationType(typeRaw, locationTypeOptions)) {
         warnings.push(
           `Row ${excelRow}: unknown location type "${cellText(typeRaw)}"`
         );
@@ -1210,7 +1238,7 @@ export default function AddLocation() {
                       <td className="px-1 py-1 align-middle">
                         <SelectField
                           compact
-                          options={LOCATION_TYPE_OPTIONS}
+                          options={locationTypeOptions}
                           value={line.location_category}
                           onChange={(val) =>
                             updateLine(line.key, { location_category: val })

@@ -24,7 +24,7 @@ const FB_OPTIONS = [
   { value: "None", label: "None" },
 ];
 
-const LOCATION_TYPE_OPTIONS = [
+const FALLBACK_LOCATION_TYPE_OPTIONS = [
   { value: "TOP_MID_WALL", label: "Top stock_Middle shelve & Wall shelve" },
   { value: "PROMOTION_ZONE_GF", label: "Promotion zone,Ground floor" },
   { value: "STATIONARY_DIGITAL", label: "Stationary & Digital-Displays" },
@@ -43,15 +43,21 @@ const LOCATION_TYPE_OPTIONS = [
   { value: "RG_WAREHOUSE", label: "RG Warehouse" },
 ];
 
-const LOCATION_CATEGORY_LABELS = Object.fromEntries(
-  LOCATION_TYPE_OPTIONS.map((opt) => [opt.value, opt.label])
-);
-
 export default function RequestLocationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useStateContext();
   const [document, setDocument] = useState(null);
+  const [locationTypeOptions, setLocationTypeOptions] = useState(
+    FALLBACK_LOCATION_TYPE_OPTIONS
+  );
+  const locationCategoryLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        locationTypeOptions.map((opt) => [opt.value, opt.label])
+      ),
+    [locationTypeOptions]
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -69,6 +75,30 @@ export default function RequestLocationDetail() {
   const canAction = isApprover && document?.status === "request";
   const canEditLine = canAction;
   const canDeleteLine = canAction;
+
+  useEffect(() => {
+    const fetchLocationTypes = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/location-types?active_only=1", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = (json.data || []).map((t) => ({
+          value: t.code,
+          label: t.name,
+        }));
+        if (list.length > 0) setLocationTypeOptions(list);
+      } catch (err) {
+        console.error("Failed to load location types:", err);
+      }
+    };
+    fetchLocationTypes();
+  }, []);
 
   useEffect(() => {
     if (!isApprover) return;
@@ -417,7 +447,7 @@ export default function RequestLocationDetail() {
                       {line.branch?.branch_name || "-"}
                     </td>
                     <td className="px-3 py-2">
-                      {LOCATION_CATEGORY_LABELS[line.location_category] ||
+                      {locationCategoryLabels[line.location_category] ||
                         line.location_category}
                     </td>
                     <td className="px-3 py-2">
@@ -642,7 +672,7 @@ export default function RequestLocationDetail() {
                     }))
                   }
                 >
-                  {LOCATION_TYPE_OPTIONS.map((opt) => (
+                  {locationTypeOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>

@@ -56,6 +56,10 @@ const router = createBrowserRouter([
         lazy: lazyPage(() => import("../pages/locations/Location_List.jsx")),
       },
       {
+        path: "location_types",
+        lazy: lazyPage(() => import("../pages/locations/Location_Type_List.jsx")),
+      },
+      {
         path: "location_requests",
         lazy: lazyPage(() => import("../pages/locations/Request_Location_List.jsx")),
       },

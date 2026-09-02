@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Drawer } from "flowbite";
 import { Link, useLocation } from "react-router-dom";
 import { useStateContext } from "../contexts/stateContext";
-import { canViewRequestLocation } from "../utils/permissions";
+import { canViewRequestLocation, canManageLocationTypes } from "../utils/permissions";
 export default function Sidebar() {
   const { user } = useStateContext();
   const showRequestLocation = canViewRequestLocation(user);
+  const showLocationType = canManageLocationTypes(user);
   const [activeItem, setActiveItem] = useState("home");
   const sidebarRef = useRef(null);
   const drawerInstanceRef = useRef(null);
@@ -437,6 +438,7 @@ export default function Sidebar() {
               </Link>
             </li>
             )}
+            {showLocationType && (
             <li
               className={`rounded-xl ${
                 activeItem === "location-type" ? "bg-primary" : ""
@@ -476,6 +478,7 @@ export default function Sidebar() {
                 </span>
               </Link>
             </li>
+            )}
             
             <li onClick={handleInstall} className="cursor-pointer">
             <div className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white dark:hover:bg-gray-700 group shadow">

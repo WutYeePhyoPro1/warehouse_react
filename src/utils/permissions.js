@@ -10,3 +10,7 @@ export function hasPermission(userContext, permission) {
 export function canViewRequestLocation(userContext) {
   return hasPermission(userContext, REQUEST_LOCATION_PERMISSION);
 }
+
+export function canManageLocationTypes(userContext) {
+  return userContext?.roles?.includes("Operation Analystis") ?? false;
+}

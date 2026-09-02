@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import Pagination from "../../components/Pagination";
+import RequireRole from "../../components/RequireRole";
 
 const PER_PAGE = 15;
 
@@ -209,6 +210,7 @@ export default function LocationTypeList() {
   };
 
   return (
+    <RequireRole role="Operation Analystis">
     <>
       <div className="mx-4 mt-2 flex items-center justify-between p-4 shadow me-2 md:me-5">
         <div>
@@ -529,5 +531,6 @@ export default function LocationTypeList() {
         </div>
       )}
     </>
+    </RequireRole>
   );
 }
